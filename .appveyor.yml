@@ -1,15 +1,32 @@
-image: Visual Studio 2022  # Windows-образ для сборки
+# Используем Windows-образ с Visual Studio (поддерживает Java и Gradle)
+image: Visual Studio 2022
 
+# Указываем версию JDK через установку Java
 environment:
-  JAVA_HOME: C:\Program Files\Eclipse Adoptium\jdk-21.0.7.6-hotspot\bin\java.exe  # Путь к JDK 11
+  JAVA_HOME: "C:\\Program Files\\Eclipse Adoptium\\jdk-21.0.7.6-hotspot"
 
+# Выключаем стандартную сборку AppVeyor
+build: off
+
+# Ветки, для которых будет работать CI
 branches:
   only:
-    - master  # Собираем только master-ветку
+    - master
 
+# Подготовка перед тестами
 install:
-  - gradlew.bat wrapper  # Инициализация Gradle Wrapper
-  - java -jar ./artifacts/app-mbank.jar &  # Запуск SUT в фоне
+  # Проверяем, что Java доступна
+  - echo %JAVA_HOME%
+  - java -version
+  - javac -version
 
-build_script:
-  - gradlew.bat test --info  # Запуск тестов с подробным выводом
+  # Запуск в фоне через PowerShell
+  - ps: Start-Process java -ArgumentList "-jar .\artifacts\app-mbank.jar" -WorkingDirectory "%CD%"
+
+  # Отложеный запуск чтобы SUT успел запуститься
+  - timeout /t 5
+
+# Скрипт запуска тестов
+test_script:
+  # Запуск автотестов с headless-режимом браузера (для Selenide)
+  - gradlew.bat test --info -Dselenide.headless=true
