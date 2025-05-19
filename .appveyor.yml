@@ -1,15 +1,16 @@
-image: Visual Studio 2022  # Windows-образ для сборки
+image: Visual Studio 2022  # Образ Windows
 
 environment:
-  JAVA_HOME: C:\Program Files\Eclipse Adoptium\jdk-21.0.7.6-hotspot\bin\java.exe  # Путь к JDK 11
+  JAVA_HOME: C:\Program Files\Eclipse Adoptium\jdk-21.0.7.6-hotspot  # Путь без \bin\java.exe
 
 branches:
   only:
-    - master  # Собираем только master-ветку
+    - master
 
 install:
-  - gradlew.bat wrapper  # Инициализация Gradle Wrapper
-  - java -jar ./artifacts/app-mbank.jar &  # Запуск SUT в фоне
+  - gradlew.bat wrapper
+  - start /B java -jar ./artifacts/app-mbank.jar  # Фоновый запуск
 
 build_script:
-  - gradlew.bat test --info  # Запуск тестов с подробным выводом
+  - timeout /t 5 /nobreak > nul  # Пауза для старта сервера
+  - gradlew.bat test --info  # Запуск тестов
