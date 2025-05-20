@@ -1,32 +1,58 @@
 plugins {
     id 'java'
+    id 'jacoco' // Добавлен плагин для покрытия кода
 }
 
 group 'ru.netology'
 version '1.0-SNAPSHOT'
 
 java {
-    sourceCompatibility = 11
+    sourceCompatibility = JavaVersion.VERSION_11
+    targetCompatibility = JavaVersion.VERSION_11 // Явно указываем target
 }
-compileJava.options.encoding = "UTF-8"
-compileTestJava.options.encoding = "UTF-8"
+
+// Унифицированные настройки кодировки
+tasks.withType(JavaCompile).configureEach {
+    options.encoding = 'UTF-8'
+}
 
 repositories {
     mavenCentral()
 }
 
 dependencies {
-    testImplementation 'io.rest-assured:rest-assured:5.5.0'
-    testImplementation 'io.rest-assured:json-schema-validator:5.5.0'
+    // Обновлённые версии библиотек
+    testImplementation 'io.rest-assured:rest-assured:5.5.1'
+    testImplementation 'io.rest-assured:json-schema-validator:5.5.1'
     testImplementation 'org.junit.jupiter:junit-jupiter:5.10.2'
+    
+    // Добавлены для лучшего тестирования
+    testImplementation 'org.assertj:assertj-core:3.25.3'
+    testImplementation 'org.hamcrest:hamcrest:2.2'
 }
 
 test {
+    useJUnitPlatform()
+    
     testLogging {
-        events "failed", "skipped", "passed"
+        events "passed", "skipped", "failed"
         exceptionFormat "full"
-        showCauses true
-        showExceptions true
-        showStackTraces true
+        showStandardStreams = true // Показывать логи stdout/stderr
     }
+    
+    finalizedBy jacocoTestReport // Генерировать отчёт о покрытии после тестов
+}
+
+jacocoTestReport {
+    dependsOn test
+    reports {
+        xml.required = true // Для интеграции с CI
+        html.required = true
+    }
+}
+
+// Для совместимости с новыми версиями Gradle
+tasks.named('test') {
+    maxHeapSize = '1G'
+    systemProperty 'file.encoding', 'UTF-8'
 }
