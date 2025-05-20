@@ -1,8 +1,12 @@
+# Общие исключения для всех проектов
 HELP.md
 .gradle
 build/
+out/
+bin/
 
-### STS ###
+### IDE ###
+# STS
 .apt_generated
 .classpath
 .factorypath
@@ -11,33 +15,44 @@ build/
 .springBeans
 .sts4-cache
 
-### IntelliJ IDEA ###
-.idea
-*.iws
+# IntelliJ
+.idea/
 *.iml
 *.ipr
-out/
+*.iws
 
-### NetBeans ###
-/nbproject/private/
-/nbbuild/
-/dist/
-/nbdist/
-/.nb-gradle/
-
-### VS Code ###
+# VS Code
 .vscode/
 
-### Package Files ###
+# NetBeans
+nbproject/private/
+nbbuild/
+nbdist/
+.nb-gradle/
+
+### Системные/архивы ###
+*.log
+*.swp
+*.bak
+*.tmp
+*.orig
+*~
+*.patch
+
+### Бинарные файлы ###
 *.jar
+!gradle/wrapper/gradle-wrapper.jar  # Разрешаем только wrapper
 *.war
-*.nar
 *.ear
+*.nar
 *.zip
 *.tar.gz
 *.rar
 
-### Exclusions ###
-!gradle/wrapper/gradle-wrapper.jar
-!**/src/main/**
-!**/src/test/**
+### Исключения для CI/CD и исходников ###
+!.github/  # Разрешаем папку для GitHub Actions
+!**/src/main/**  # Исходный код
+!**/src/test/**  # Тесты
+
+### Кастомные артефакты (опционально) ###
+# !artifacts/*.jar  # Раскомментировать, если используете artifacts/
