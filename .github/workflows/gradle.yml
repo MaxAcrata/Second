@@ -1,4 +1,4 @@
-name: Java CI on Windows
+name: Java CI
 
 on: [push, pull_request]
 
@@ -9,46 +9,20 @@ jobs:
     steps:
       - uses: actions/checkout@v4
 
-      - name: Set up JDK 11
+      - name: Set up JDK
         uses: actions/setup-java@v3
         with:
           java-version: '11'
           distribution: 'temurin'
 
-      - name: Start server and verify
-        run: |
-          # Запуск сервера в фоне
-          $serverProcess = Start-Process -NoNewWindow -PassThru -FilePath "java" -ArgumentList "-jar .\artifacts\app-mbank.jar"
-          
-          # Ждем до 30 секунд пока сервер станет доступен
-          $attempts = 0
-          $maxAttempts = 30
-          $connected = $false
-          
-          while ($attempts -lt $maxAttempts -and -not $connected) {
-              try {
-                  $response = Invoke-WebRequest -Uri "http://localhost:9999/api/v1/demo/accounts" -UseBasicParsing -ErrorAction Stop
-                  if ($response.StatusCode -eq 200) {
-                      $connected = $true
-                      Write-Host "Server is ready!"
-                  }
-              } catch {
-                  Start-Sleep -Seconds 1
-                  $attempts++
-                  Write-Host "Waiting for server... Attempt $attempts/$maxAttempts"
-              }
-          }
-          
-          if (-not $connected) {
-              Write-Host "Server failed to start!"
-              Stop-Process -Id $serverProcess.Id -Force
-              exit 1
-          }
-
       - name: Run tests
-        run: .\gradlew.bat test --info
+        run: .\gradlew.bat test --info --stacktrace
 
-      - name: Stop server
+      - name: Upload reports
         if: always()
-        run: |
-          Stop-Process -Name "java" -Force -ErrorAction SilentlyContinue
+        uses: actions/upload-artifact@v3
+        with:
+          name: test-reports
+          path: |
+            build/reports/**
+            build/test-results/**
