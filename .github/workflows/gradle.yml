@@ -1,4 +1,4 @@
-name: Java CI with Gradle
+name: Java CI on Windows
 
 on: [push, pull_request]
 
@@ -15,32 +15,48 @@ jobs:
           java-version: '11'
           distribution: 'temurin'
 
-      - name: Make gradlew executable
-        run: chmod +x gradlew
-
-      - name: Start server
+      - name: Start server with healthcheck
         run: |
-          Start-Process -NoNewWindow -FilePath "java" -ArgumentList "-jar .\artifacts\app-mbank.jar"
-          Start-Sleep -Seconds 5
-          Invoke-WebRequest -Uri "http://localhost:9999/api/v1/demo/accounts" -UseBasicParsing
+          # 1. Запускаем сервер в фоне и сохраняем PID
+          $server = Start-Process -NoNewWindow -PassThru -FilePath "java" -ArgumentList "-jar .\artifacts\app-mbank.jar"
+          $serverPID = $server.Id
+          Write-Host "Server started with PID: $serverPID"
 
-      - name: Run tests with Gradle
-        run: ./gradlew test --info --stacktrace
+          # 2. Функция проверки доступности
+          function Test-ServerReady {
+              $attempt = 0
+              $maxAttempts = 30
+              $ready = $false
 
-      - name: Upload test reports
+              while ($attempt -lt $maxAttempts -and -not $ready) {
+                  $attempt++
+                  try {
+                      $response = Invoke-WebRequest -Uri "http://localhost:9999/api/v1/demo/accounts" -UseBasicParsing -ErrorAction Stop
+                      if ($response.StatusCode -eq 200) {
+                          $ready = $true
+                          Write-Host "Server is ready after $attempt seconds"
+                          return $true
+                      }
+                  } catch {
+                      Write-Host "Attempt $attempt/$maxAttempts: Server not ready yet..."
+                      Start-Sleep -Seconds 1
+                  }
+              }
+              return $false
+          }
+
+          # 3. Проверка с таймаутом
+          if (-not (Test-ServerReady)) {
+              Write-Host "Server failed to start within 30 seconds"
+              Stop-Process -Id $serverPID -Force
+              exit 1
+          }
+
+      - name: Run tests
+        run: .\gradlew.bat test --info --stacktrace
+
+      - name: Stop server
         if: always()
-        uses: actions/upload-artifact@v4  # Обновлено до v4
-        with:
-          name: test-reports
-          path: |
-            build/reports/tests/test/
-            build/test-results/test/
-          retention-days: 5  # Автоматическое удаление через 5 дней
-
-      - name: Upload JaCoCo reports
-        if: always()
-        uses: actions/upload-artifact@v4
-        with:
-          name: jacoco-reports
-          path: build/reports/jacoco/test/
-          retention-days: 5
+        run: |
+          Get-Process -Name "java" -ErrorAction SilentlyContinue | Stop-Process -Force
+          Write-Host "Server process stopped"
