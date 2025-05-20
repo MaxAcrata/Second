@@ -15,40 +15,34 @@ jobs:
           java-version: '11'
           distribution: 'temurin'
 
-      - name: Start server with healthcheck
+      - name: Start and verify server
         run: |
-          # 1. Запускаем сервер в фоне и сохраняем PID
-          $server = Start-Process -NoNewWindow -PassThru -FilePath "java" -ArgumentList "-jar .\artifacts\app-mbank.jar"
-          $serverPID = $server.Id
-          Write-Host "Server started with PID: $serverPID"
+          # 1. Запуск сервера
+          $serverProcess = Start-Process -NoNewWindow -PassThru -FilePath "java" -ArgumentList "-jar .\artifacts\app-mbank.jar"
+          Write-Host "Server started with PID: $($serverProcess.Id)"
 
-          # 2. Функция проверки доступности
-          function Test-ServerReady {
-              $attempt = 0
-              $maxAttempts = 30
-              $ready = $false
+          # 2. Проверка доступности
+          $attempt = 0
+          $maxAttempts = 30
+          $isReady = $false
 
-              while ($attempt -lt $maxAttempts -and -not $ready) {
-                  $attempt++
-                  try {
-                      $response = Invoke-WebRequest -Uri "http://localhost:9999/api/v1/demo/accounts" -UseBasicParsing -ErrorAction Stop
-                      if ($response.StatusCode -eq 200) {
-                          $ready = $true
-                          Write-Host "Server is ready after $attempt seconds"
-                          return $true
-                      }
-                  } catch {
-                      Write-Host "Attempt $attempt/$maxAttempts: Server not ready yet..."
-                      Start-Sleep -Seconds 1
+          while ($attempt -lt $maxAttempts -and -not $isReady) {
+              $attempt++
+              try {
+                  $response = Invoke-WebRequest -Uri "http://localhost:9999/api/v1/demo/accounts" -UseBasicParsing -ErrorAction Stop
+                  if ($response.StatusCode -eq 200) {
+                      $isReady = $true
+                      Write-Host "Server is ready after $attempt seconds"
                   }
+              } catch {
+                  Write-Host "Attempt $attempt of $maxAttempts: Server not ready yet..."
+                  Start-Sleep -Seconds 1
               }
-              return $false
           }
 
-          # 3. Проверка с таймаутом
-          if (-not (Test-ServerReady)) {
-              Write-Host "Server failed to start within 30 seconds"
-              Stop-Process -Id $serverPID -Force
+          if (-not $isReady) {
+              Write-Host "Error: Server failed to start within $maxAttempts seconds"
+              Stop-Process -Id $serverProcess.Id -Force
               exit 1
           }
 
@@ -58,5 +52,5 @@ jobs:
       - name: Stop server
         if: always()
         run: |
-          Get-Process -Name "java" -ErrorAction SilentlyContinue | Stop-Process -Force
-          Write-Host "Server process stopped"
+          taskkill /IM "java.exe" /F /T 2>&1 | Out-Null
+          Write-Host "Server process terminated"
