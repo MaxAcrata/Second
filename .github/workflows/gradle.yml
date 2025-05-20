@@ -1,45 +1,54 @@
-name: Java CI with Gradle (Windows)  # Название workflow в интерфейсе GitHub
+name: Java CI on Windows
 
-# Триггеры запуска:
-on: 
-  push:    # При любом push в репозиторий
-  pull_request:  # При создании/обновлении PR
+on: [push, pull_request]
 
 jobs:
   build:
-    # Среда выполнения - свежая Windows виртуалка от GitHub
-    runs-on: windows-latest  
+    runs-on: windows-latest
 
     steps:
-      # Шаг 1: Получение кода репозитория
-      - uses: actions/checkout@v4  # Стандартное действие для checkout кода
+      - uses: actions/checkout@v4
 
-      # Шаг 2: Установка JDK
       - name: Set up JDK 11
-        uses: actions/setup-java@v3  # Официальное действие для Java
+        uses: actions/setup-java@v3
         with:
-          java-version: '11'  # Точная версия JDK
-          distribution: 'temurin'  # Дистрибутив от Eclipse (ex-AdoptOpenJDK)
+          java-version: '11'
+          distribution: 'temurin'
 
-      # Шаг 3: Запуск тестового сервера
-      - name: Start server
+      - name: Start server and verify
         run: |
-          # Запуск JAR в фоне без нового окна
-          Start-Process -NoNewWindow -FilePath "java" -ArgumentList "-jar .\artifacts\app-mbank.jar"
+          # Запуск сервера в фоне
+          $serverProcess = Start-Process -NoNewWindow -PassThru -FilePath "java" -ArgumentList "-jar .\artifacts\app-mbank.jar"
           
-          # Ожидание инициализации сервера (5 сек)
-          Start-Sleep -Seconds 5
+          # Ждем до 30 секунд пока сервер станет доступен
+          $attempts = 0
+          $maxAttempts = 30
+          $connected = $false
           
-          # Проверка доступности эндпоинта
-          Invoke-WebRequest -Uri "http://localhost:9999/api/v1/demo/accounts" -UseBasicParsing
+          while ($attempts -lt $maxAttempts -and -not $connected) {
+              try {
+                  $response = Invoke-WebRequest -Uri "http://localhost:9999/api/v1/demo/accounts" -UseBasicParsing -ErrorAction Stop
+                  if ($response.StatusCode -eq 200) {
+                      $connected = $true
+                      Write-Host "Server is ready!"
+                  }
+              } catch {
+                  Start-Sleep -Seconds 1
+                  $attempts++
+                  Write-Host "Waiting for server... Attempt $attempts/$maxAttempts"
+              }
+          }
+          
+          if (-not $connected) {
+              Write-Host "Server failed to start!"
+              Stop-Process -Id $serverProcess.Id -Force
+              exit 1
+          }
 
-      # Шаг 4: Запуск тестов
       - name: Run tests
-        run: .\gradlew.bat test --info  # Запуск Gradle с подробным логом
+        run: .\gradlew.bat test --info
 
-      # Шаг 5: Остановка сервера (выполняется ВСЕГДА, даже если тесты упали)
       - name: Stop server
-        if: always()  # Критически важный параметр
+        if: always()
         run: |
-          # Принудительное завершение всех Java-процессов
           Stop-Process -Name "java" -Force -ErrorAction SilentlyContinue
