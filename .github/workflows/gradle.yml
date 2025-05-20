@@ -1,0 +1,45 @@
+name: Java CI with Gradle (Windows)  # Название workflow в интерфейсе GitHub
+
+# Триггеры запуска:
+on: 
+  push:    # При любом push в репозиторий
+  pull_request:  # При создании/обновлении PR
+
+jobs:
+  build:
+    # Среда выполнения - свежая Windows виртуалка от GitHub
+    runs-on: windows-latest  
+
+    steps:
+      # Шаг 1: Получение кода репозитория
+      - uses: actions/checkout@v4  # Стандартное действие для checkout кода
+
+      # Шаг 2: Установка JDK
+      - name: Set up JDK 11
+        uses: actions/setup-java@v3  # Официальное действие для Java
+        with:
+          java-version: '11'  # Точная версия JDK
+          distribution: 'temurin'  # Дистрибутив от Eclipse (ex-AdoptOpenJDK)
+
+      # Шаг 3: Запуск тестового сервера
+      - name: Start server
+        run: |
+          # Запуск JAR в фоне без нового окна
+          Start-Process -NoNewWindow -FilePath "java" -ArgumentList "-jar .\artifacts\app-mbank.jar"
+          
+          # Ожидание инициализации сервера (5 сек)
+          Start-Sleep -Seconds 5
+          
+          # Проверка доступности эндпоинта
+          Invoke-WebRequest -Uri "http://localhost:9999/api/v1/demo/accounts" -UseBasicParsing
+
+      # Шаг 4: Запуск тестов
+      - name: Run tests
+        run: .\gradlew.bat test --info  # Запуск Gradle с подробным логом
+
+      # Шаг 5: Остановка сервера (выполняется ВСЕГДА, даже если тесты упали)
+      - name: Stop server
+        if: always()  # Критически важный параметр
+        run: |
+          # Принудительное завершение всех Java-процессов
+          Stop-Process -Name "java" -Force -ErrorAction SilentlyContinue
