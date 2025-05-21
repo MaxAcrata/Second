@@ -16,12 +16,13 @@ jobs:
           distribution: 'temurin'
 
       - name: Start and verify server
+        shell: pwsh
         run: |
-          # 1. Запуск сервера
-          $serverProcess = Start-Process -NoNewWindow -PassThru -FilePath "java" -ArgumentList "-jar .\artifacts\app-mbank.jar"
+          # 1. Запуск сервера в фоне
+          $serverProcess = Start-Process -FilePath "java" -ArgumentList "-jar", ".\\artifacts\\app-mbank.jar" -PassThru
           Write-Host "Server started with PID: $($serverProcess.Id)"
 
-          # 2. Проверка доступности
+          # 2. Проверка доступности (макс. 30 попыток)
           $attempt = 0
           $maxAttempts = 30
           $isReady = $false
@@ -29,28 +30,27 @@ jobs:
           while ($attempt -lt $maxAttempts -and -not $isReady) {
               $attempt++
               try {
-                  $response = Invoke-WebRequest -Uri "http://localhost:9999/api/v1/demo/accounts" -UseBasicParsing -ErrorAction Stop
+                  $response = Invoke-WebRequest -Uri "http://localhost:9999/api/v1/demo/accounts" -UseBasicParsing -TimeoutSec 2 -ErrorAction Stop
                   if ($response.StatusCode -eq 200) {
+                      Write-Host "Server is ready"
                       $isReady = $true
-                      Write-Host "Server is ready after $attempt seconds"
+                      break
                   }
               } catch {
-                  Write-Host "Attempt $attempt of $maxAttempts: Server not ready yet..."
+                  Write-Host "Attempt ${attempt} of ${maxAttempts}: Server not ready yet"
                   Start-Sleep -Seconds 1
               }
           }
 
           if (-not $isReady) {
-              Write-Host "Error: Server failed to start within $maxAttempts seconds"
+              Write-Host "Server did not become ready in time"
               Stop-Process -Id $serverProcess.Id -Force
               exit 1
           }
 
       - name: Run tests
-        run: .\gradlew.bat test --info --stacktrace
+        run: ./gradlew clean test --info
 
-      - name: Stop server
-        if: always()
-        run: |
-          taskkill /IM "java.exe" /F /T 2>&1 | Out-Null
-          Write-Host "Server process terminated"
+      - name: Kill server process
+        shell: cmd
+        run: taskkill /IM "java.exe" /F /T 2>&1 | Out-Null
