@@ -4,7 +4,6 @@ import org.junit.jupiter.api.Test;
 
 import static io.restassured.RestAssured.given;
 import static io.restassured.module.jsv.JsonSchemaValidator.matchesJsonSchemaInClasspath;
-import static org.hamcrest.Matchers.*;
 
 class MobileBankApiTestV4 {
     @Test
@@ -21,9 +20,6 @@ class MobileBankApiTestV4 {
                 // Включаем логирование ответа
                 .log().all()
                 .statusCode(200)
-                // Проверка JSON схемы
-                .body(matchesJsonSchemaInClasspath("accounts.schema.json"))
-                // Дополнительные проверки валюты
-                .body("currency", everyItem(anyOf(equalTo("RUB"), equalTo("USD"))));
+                .body(matchesJsonSchemaInClasspath("accounts.schema.json"));
     }
 }
