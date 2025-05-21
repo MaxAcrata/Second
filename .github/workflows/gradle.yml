@@ -18,11 +18,9 @@ jobs:
       - name: Start and verify server
         shell: pwsh
         run: |
-          # 1. Запуск сервера в фоне
           $serverProcess = Start-Process -FilePath "java" -ArgumentList "-jar", ".\\artifacts\\app-mbank.jar" -PassThru
           Write-Host "Server started with PID: $($serverProcess.Id)"
 
-          # 2. Проверка доступности (макс. 30 попыток)
           $attempt = 0
           $maxAttempts = 30
           $isReady = $false
@@ -52,5 +50,9 @@ jobs:
         run: ./gradlew clean test --info
 
       - name: Kill server process
-        shell: cmd
-        run: taskkill /IM "java.exe" /F /T 2>&1 | Out-Null
+        shell: pwsh
+        run: |
+          Get-Process java -ErrorAction SilentlyContinue | ForEach-Object {
+            Write-Host "Stopping process ID $($_.Id)"
+            Stop-Process -Id $_.Id -Force
+          }
